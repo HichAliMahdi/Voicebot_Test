@@ -73,12 +73,12 @@ def get_question():
 
 def send_email(email, phone_number):
     # Update the following information with your email server details
-    smtp_server = "oxxodata.net"
-    smtp_port = 465
-    smtp_username = "h.ali@oxxodata.net"
-    smtp_password = "9R65?jzd"
-    sender_email = "h.ali@oxxodata.net"
-    receiver_email = "h.ali@oxxodata.com"
+    smtp_server = ""
+    smtp_port = 
+    smtp_username = ""
+    smtp_password = ""
+    sender_email = ""
+    receiver_email = ""
 
     subject = "User Information"
     body = f"Email: {email}\nPhone Number: {phone_number}"
