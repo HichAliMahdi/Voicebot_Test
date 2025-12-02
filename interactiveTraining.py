@@ -1,8 +1,21 @@
-from chatterbot import ChatBot
-from chatterbot.trainers import ChatterBotCorpusTrainer
-import speech_recognition as sr
-import pyttsx3
-import spacy
+try:
+    from chatterbot import ChatBot
+    from chatterbot.trainers import ChatterBotCorpusTrainer
+except Exception:
+    print("chatterbot not available. Skipping automated training. Install chatterbot if you want training functionality.")
+else:
+    bot = ChatBot('MyBot')
+    trainer = ChatterBotCorpusTrainer(bot)
+    # Train on small English & French corpora if available
+    try:
+        trainer.train('chatterbot.corpus.english')
+    except Exception as e:
+        print("English corpus training failed or not available:", e)
+    try:
+        trainer.train('chatterbot.corpus.french')
+    except Exception:
+        pass
+    print("Training completed (if corpora were available).")
 
 # Function to recognize speech
 def recognize_speech():
@@ -27,15 +40,6 @@ def text_to_speech(text):
     engine = pyttsx3.init()
     engine.say(text)
     engine.runAndWait()
-
-# Create a new chat bot
-bot = ChatBot('MyBot')
-
-# Create a new trainer for the chat bot
-trainer = ChatterBotCorpusTrainer(bot)
-
-# Train the chat bot on English language data
-trainer.train('chatterbot.corpus.english')
 
 # Main loop for interaction
 while True:

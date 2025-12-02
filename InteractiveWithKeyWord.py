@@ -1,5 +1,6 @@
 import speech_recognition as sr
 import pyttsx3
+from voicebot_core import VoiceIO
 
 def recognize_speech():
     recognizer = sr.Recognizer()
@@ -70,6 +71,19 @@ def get_question():
     }
     return questions.get(current_state, "Désolé, une erreur s'est produite.")
 
+def find_keyword(text: str):
+    kws = {
+        "aide": "Je peux vous aider avec les informations de compte, facturation ou assistance technique.",
+        "urgence": "Si c'est une urgence, veuillez contacter les services d'urgence locaux.",
+        "facture": "Je peux vous donner le statut de votre facture si vous fournissez votre identifiant client.",
+        "email": "D'accord, je vais vous demander votre adresse e-mail."
+    }
+    txt = (text or "").lower()
+    for k, resp in kws.items():
+        if k in txt:
+            return resp
+    return None
+
 # Initialize state
 current_state = "purpose"
 
@@ -80,3 +94,23 @@ while current_state != "finished":
         response = process_input(user_input)
         if response:
             text_to_speech(response)
+
+def main():
+    io = VoiceIO(config_path=None)
+    io.speak("Bonjour, dites un mot-clé pour commencer (par ex. aide, facture, urgence).")
+    while True:
+        heard = io.listen(prompt=None)
+        if not heard:
+            io.speak("Je n'ai pas entendu. Voulez-vous réessayer ?")
+            continue
+        if heard.lower().strip() in ("quit", "exit", "stop", "au revoir"):
+            io.speak("Au revoir.")
+            break
+        resp = find_keyword(heard)
+        if resp:
+            io.speak(resp)
+        else:
+            io.speak("Mot-clé non reconnu. Dites aide, facture ou urgence.")
+
+if __name__ == "__main__":
+    main()
