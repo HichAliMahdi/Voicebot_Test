@@ -2,12 +2,28 @@ import json
 import os
 import re
 import time
+import sounddevice as sd
+import numpy as np
 import speech_recognition as sr
+import io
+import wave
 import pyttsx3
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import Optional
+
+def record_audio_to_file(duration=5, fs=16000):
+    audio = sd.rec(int(duration * fs), samplerate=fs, channels=1, dtype='int16')
+    sd.wait()
+    byte_io = io.BytesIO()
+    with wave.open(byte_io, 'wb') as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(fs)
+        wf.writeframes(audio.tobytes())
+    byte_io.seek(0)
+    return byte_io
 
 class VoiceIO:
     def __init__(self, config_path=None):
@@ -41,12 +57,9 @@ class VoiceIO:
     def listen(self, prompt: Optional[str] = None, timeout: int = 6, phrase_time_limit: int = 10) -> Optional[str]:
         if prompt:
             self.speak(prompt)
-        with sr.Microphone() as source:
-            self.recognizer.adjust_for_ambient_noise(source, duration=0.4)
-            try:
-                audio = self.recognizer.listen(source, timeout=timeout, phrase_time_limit=phrase_time_limit)
-            except sr.WaitTimeoutError:
-                return None
+        audio_file = record_audio_to_file(duration=timeout)
+        with sr.AudioFile(audio_file) as source:
+            audio = self.recognizer.record(source)
         try:
             text = self.recognizer.recognize_google(audio, language=self.language)
             print("You said:", text)
@@ -57,20 +70,13 @@ class VoiceIO:
             return None
 
 # simple validators
-def validate_email(addr: str) -> bool:
-    if not addr:
-        return False
-    addr = addr.strip()
-    pattern = r"[^@ \t\r\n]+@[^@ \t\r\n]+\.[^@ \t\r\n]+"
-    return re.match(pattern, addr) is not None
-
 def validate_phone(number: str) -> bool:
     if not number:
         return False
     digits = re.sub(r"\D", "", number)
     return 7 <= len(digits) <= 15
 
-def send_email(config: dict, user_email: str, phone_number: str):
+def send_email(config: dict, phone_number: str):
     smtp_server = config.get("smtp_server")
     smtp_port = config.get("smtp_port")
     smtp_username = config.get("smtp_username")
@@ -83,7 +89,7 @@ def send_email(config: dict, user_email: str, phone_number: str):
         return False
 
     subject = "User Information from VoiceBot"
-    body = f"Email: {user_email}\nPhone Number: {phone_number}\nTimestamp: {time.ctime()}"
+    body = f"Phone Number: {phone_number}\nTimestamp: {time.ctime()}"
 
     message = MIMEMultipart()
     message["From"] = sender_email
@@ -114,10 +120,9 @@ class VoiceBot:
             except Exception:
                 self.config = {}
         self.state = "purpose"
-        self._collected = {"purpose": None, "email": None, "phone": None}
+        self._collected = {"purpose": None, "phone": None}
         self.questions = {
             "purpose": "Quel est le but de votre appel?",
-            "email": "Quelle est votre adresse e-mail?",
             "phone": "Quel est votre numéro de téléphone?",
             "confirm": "Confirmez-vous que les informations sont correctes? Dites oui pour valider ou non pour recommencer.",
             "finished": "Merci d'avoir fourni les informations. Votre demande est en cours de traitement."
@@ -131,15 +136,8 @@ class VoiceBot:
             return False, "Je n'ai pas bien entendu. Voulez-vous répéter?"
         if self.state == "purpose":
             self._collected["purpose"] = text
-            self.state = "email"
+            self.state = "phone"
             return True, None
-        if self.state == "email":
-            if validate_email(text):
-                self._collected["email"] = text
-                self.state = "phone"
-                return True, None
-            else:
-                return False, "Adresse e-mail invalide. Pouvez-vous répéter votre adresse e-mail?"
         if self.state == "phone":
             if validate_phone(text):
                 self._collected["phone"] = text
@@ -155,7 +153,7 @@ class VoiceBot:
             else:
                 # restart collection
                 self.state = "purpose"
-                self._collected = {"purpose": None, "email": None, "phone": None}
+                self._collected = {"purpose": None, "phone": None}
                 return True, "D'accord, reprenons depuis le début."
 
         return False, "Etat inconnu."
@@ -181,5 +179,5 @@ class VoiceBot:
                 self.io.speak(message)
         # finished: send email if configured
         self.io.speak(self._ask("finished"))
-        send_email(self.config, self._collected["email"], self._collected["phone"])
+        send_email(self.config, self._collected["phone"])
         return self._collected

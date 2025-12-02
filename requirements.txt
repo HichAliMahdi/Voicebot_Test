@@ -1,6 +1,7 @@
 SpeechRecognition
-PyAudio
 pyttsx3
 spacy
 chatterbot
 chatterbot-corpus
+sounddevice
+numpy
